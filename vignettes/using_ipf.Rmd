@@ -127,7 +127,7 @@ seed %>%
 We can use the ipfr package to change this.  For this example, the `verbose`
 option is turned on to show what the tool reports upon completion.
 ```{r}
-table <- ipf(seed, targets, verbose = TRUE)
+table <- ipf(seed, targets, verbose = FALSE)
 ```
 
 A sample of the resulting table is shown below.

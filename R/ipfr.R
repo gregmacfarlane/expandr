@@ -78,8 +78,8 @@ ipf <- function(seed, targets,
   # (e.g. total households, persons, etc.)
   totals <- targets[[1]] %>%
     tidyr::gather(key = category, value = count, -ID) %>%
-    group_by(ID) %>%
-    summarize(total = sum(count))
+    dplyr::group_by(ID) %>%
+    dplyr::summarize(total = sum(count))
   
   # Create a long data frame by repeating the seed table for each
   # row in the target tables.
@@ -209,12 +209,11 @@ ipf <- function(seed, targets,
   
   if (verbose) {
     position <- which(rel_gap == max(rel_gap))[1]
-    cat("\n", "Max Rel Gap:", rel_gap[position])
-    cat("\n", "Absolute Gap:", abs_gap[position])
-    cat("\n", "ID:", rel_id[position])
-    cat("\n", "Marginal:", names(targets)[position])
-    cat("\n", "Category:", rel_cat[position])
-    cat("\n")
+    message("Max Rel Gap:", rel_gap[position])
+    message("Absolute Gap:", abs_gap[position])
+    message("ID:", rel_id[position])
+    message("Marginal:", names(targets)[position])
+    message("Category:", rel_cat[position])
     utils::flush.console()
   }
   
