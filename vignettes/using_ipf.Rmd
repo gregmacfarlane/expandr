@@ -31,7 +31,6 @@ balancing household- and person-level marginals in the `ipu()` function.
 library(dplyr)
 library(tidyr)
 library(ipfr)
-library(htmlTable)
 ```
 
 # IPU
@@ -61,78 +60,50 @@ make up some survey data.
 
   * Each row represents a household
   * The household ID column is named/renamed to `pid` ("primary ID")
-  * The geography field is inlcluded and starts with "geo_" (`geo_cluster`)
+  * The geography field is included and starts with "geo_" (`geo_taz`)
+    * There are two traffic analysis zones (TAZs), each with different
+      seed data and targets.
 
 ```{r}
-hh_seed <- data_frame(
-  pid = c(1, 2, 3, 4),
-  siz = c(1, 2, 1, 1),
-  weight = c(1, 1, 1, 1),
-  geo_cluster = c(1, 1, 2, 2)
+hh_seed <- tribble(
+  ~pid, ~siz, ~inc, ~weight, ~geo_taz,
+  1,    1,    1,    12,       1,
+  2,    1,    2,     3,       1,
+  3,    2,    1,    6,       1,
+  4,    2,    2,    5,       1
 )
-
-hh_seed %>%
-  htmlTable(
-    rnames = FALSE, caption = "Seed Table with Cluster Appended"
-  )
 ```
 
 ### Target creation
 The number of households by size (e.g., 1-person, 2-person, etc.) is referred to
-as a marginal distribution.  Often, from the Census, we know the total number of 
-households by each individual marginal.  For example, we know the number of 
-households by size:
+as a marginal distribution.  Often, from the Census, we know the total number of
+households by each individual marginal. This information becomes the target that
+the IPU process tries to match.
 
-  * 1 person households 
-    * 75 in geographic cluster 1
-    * 100 in cluster 2
-  * 2 personshouseholds
-    * 25 in cluster 1
-    * 150 in cluster 2
+Marginal targets are specified below for each taz:
 
-This information becomes the target that the IPU process tries to match.
-
-Marginal targets are specified below for each cluster:
-
-  * The geography field `geo_cluster` matches the seed table
-  * The name of the table in the list links it to the `siz` column of the seed
-  * The column names are the values that show up in the seed's `siz` column
+  * The geography field `geo_taz` matches the seed table.
+  * The name of the table in the list links it to the `siz` and `inc` columns of the     seed.
+  * The column names are the values that show up in the seed's `siz` and `inc`
+    columns.
 
 ```{r}
 hh_targets <- list()
-hh_targets$siz <- data_frame(
-  geo_cluster = c(1, 2),
-  `1` = c(75, 100),
-  `2` = c(25, 150)
+hh_targets$siz <- tribble(
+  ~geo_taz, ~`1`, ~`2`,
+  1,        18,   12
+)
+hh_targets$inc <- tribble(
+  ~geo_taz, ~`1`, ~`2`,
+  1,        20,  10
 )
 
-hh_targets$siz %>%
-  htmlTable(
-    rnames = FALSE, caption = "Target Table"
-  )
+hh_targets
 ```
 
 ### Run IPU
 
-Run `ipu()`. Note that it throws an error. When providing cluster values in
-the seed table, `ipfr` checks to make sure that every marginal category appears
-in every cluster. In this case, the seed table does not have a 2-person household
-in cluster 2. This makes it impossible to match that marginal target.
-
 ```{r}
-result <- ipu(hh_seed, hh_targets)
-```
-
-Fix the seed table and re-run `ipu`. The results match the targets we provided.
-
-```{r}
-hh_seed <- data_frame(
-  pid = c(1, 2, 3, 4),
-  siz = c(1, 2, 2, 1),
-  weight = c(1, 1, 1, 1),
-  geo_cluster = c(1, 1, 2, 2)
-)
-
 result <- ipu(hh_seed, hh_targets)
 ```
 
@@ -142,8 +113,8 @@ result <- ipu(hh_seed, hh_targets)
 names(result)
 ```
 
-The first element is the resulting weight table. The primary seed has three
-columns appended:
+The first element is the resulting weight table. It is the primary seed table
+with three columns added:
 
   * weight
     * The expanded weight of the record.
@@ -153,10 +124,7 @@ columns appended:
     * The weight divided by the average weight.
 
 ```{r}
-result$weight_tbl %>%
-  htmlTable(
-    rnames = FALSE
-  )
+result$weight_tbl
 ```
 
 The second element is a histogram of the `weight_factor`. This provides a quick
@@ -170,14 +138,31 @@ The next element is a comparison back to the targets provided. With complex
 seed and target tables, this makes investigating results quick and easy.
 
 ```{r}
-result$primary_comp %>%
-  htmlTable(
-    rnames = FALSE
-  )
+result$primary_comp
 ```
 
 If secondary targets are provided to `ipu()`, a fourth item in the list will
 contain a `secondary_comp` table.
+
+In addition to making sure the marginal targets are matched, it is important to
+ensure that the underlying distribution of households still resembles the seed
+data. As an example, if your seed data says that most low-income households are
+also one-person households, that information should be preserved.
+
+```{r}
+hh_seed %>%
+  mutate(inc = paste0("inc", inc)) %>%
+  filter(geo_taz == 1) %>%
+  select(siz, inc, weight) %>%
+  spread(inc, weight)
+
+result$weight_tbl %>%
+  mutate(inc = paste0("inc", inc)) %>%
+  filter(geo_taz == 1) %>%
+  select(siz, inc, weight) %>%
+  spread(inc, weight)
+```
+
 
 ## Example 2: The Arizona Paper Example
 
@@ -248,22 +233,13 @@ a secondary comparison table. Feel free to run the code chunk above for
 
 ```{r arizona results}
 result$weight_tbl %>%
-  mutate(weight = round(weight, 2)) %>%
-  htmlTable(
-    rnames = FALSE, caption = "Result"
-  )
+  mutate(weight = round(weight, 2))
   
 result$primary_comp %>% 
-  mutate(result = round(result, 2)) %>%
-  htmlTable(
-    rnames = FALSE, caption = "Primary Comparison"
-  )
+  mutate(result = round(result, 2))
 
 result$secondary_comp %>% 
-  mutate(result = round(result, 2)) %>%
-  htmlTable(
-    rnames = FALSE, caption = "Secondary Comparison"
-  )
+  mutate(result = round(result, 2))
 ```
 
 
@@ -304,10 +280,7 @@ hh_seed <- bind_rows(
 )
 hh_seed$geo_region = 1
 
-hh_seed %>%
-  htmlTable(
-    rnames = FALSE, caption = "Modified household seed table"
-  )
+hh_seed
 
 # Repeat the household targets for two clusters
 hh_targets$hhtype <- bind_rows(hh_targets$hhtype, hh_targets$hhtype)
@@ -315,10 +288,7 @@ hh_targets$hhtype <- hh_targets$hhtype %>%
   rename(geo_cluster = geo_region) %>%
   mutate(geo_cluster = c(1, 2))
 
-hh_targets$hhtype %>%
-  htmlTable(
-    rnames = FALSE, caption = "Modified household targets"
-  )
+hh_targets$hhtype
 
 # Repeat the per_seed to create cluster 1 and 2 persons
 per_seed <- bind_rows(
@@ -328,10 +298,7 @@ per_seed <- bind_rows(
 )
 
 per_seed %>%
-  head() %>%
-  htmlTable(
-    rnames = FALSE, caption = "Modified person seed (first few rows)"
-  )
+  head()
 
 # Double the regional person targets
 per_targets$pertype <- per_targets$pertype %>%
@@ -340,10 +307,7 @@ per_targets$pertype <- per_targets$pertype %>%
     .funs = funs(. * 2)
   )
 
-per_targets$pertype %>%
-  htmlTable(
-    rnames = FALSE, caption = "Modified person targets"
-  )
+per_targets$pertype
 ```
 
 Run the IPU algorithm. Again, for vignette build time, only 30 iterations are
@@ -359,16 +323,10 @@ would make a better match.
 
 ```{r multigeo results}
 result$primary_comp %>%
-  mutate(result = round(result, 2)) %>%
-  htmlTable(
-    rnames = FALSE, caption = "Primary Comparison"
-  )
+  mutate(result = round(result, 2))
 
 result$secondary_comp %>%
-  mutate(result = round(result, 2)) %>%
-  htmlTable(
-    rnames = FALSE, caption = "Secondary Comparison"
-  )
+  mutate(result = round(result, 2))
 ```
 
 # How IPU addresses common IPF problems
@@ -452,9 +410,6 @@ result$primary_comp %>%
   mutate_at(
     .vars = vars(target, result),
     .funs = funs(round(., 2))
-  ) %>%
-  htmlTable(
-    rnames = FALSE, caption = "Scaled Results"
   )
 ```
 
@@ -607,10 +562,7 @@ weights must be between 40 and 60. The algorithm does not have enough flexibilit
 to meet the controls.
 
 ```{r}
-result$primary_comp %>%
-  htmlTable(
-    rnames = FALSE, caption = "Constrained Results"
-  )
+result$primary_comp
 ```
 
 A second problem can arrise from capping weights based on the average weight. In
@@ -629,10 +581,7 @@ hh_targets$siz <- data_frame(
 result <- ipu(hh_seed, hh_targets, max_iterations = 10,
               max_ratio = 5, min_ratio = .2)
 
-result$primary_comp %>%
-  htmlTable(
-    rnames = FALSE, caption = "Unbalanced Targets"
-  )
+result$primary_comp
 ```
 
 Even with reasonable values for the weight caps, the minimum allowable weight is
