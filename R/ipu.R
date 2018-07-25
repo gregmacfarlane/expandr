@@ -168,7 +168,7 @@ ipu <- function(primary_seed, primary_targets,
   # Pull off the geo information into a separate equivalency table
   # to be used as needed.
   geo_equiv <- primary_seed %>%
-    dplyr::select(dplyr::starts_with("geo_"), "pid")
+    dplyr::select(dplyr::starts_with("geo_"), "pid", "weight")
   primary_seed_mod <- primary_seed %>%
     dplyr::select(-dplyr::starts_with("geo_"))
   
@@ -226,7 +226,6 @@ ipu <- function(primary_seed, primary_targets,
   
   # Add the geo information back.
   seed <- seed %>%
-    dplyr::mutate(weight = 1)  %>%
     dplyr::left_join(geo_equiv, by = "pid")
   
   # store a vector of attribute column names to loop over later.
