@@ -603,6 +603,7 @@ compare_results <- function(seed, targets){
     
     # Gather the current target table into long form
     target <- target %>%
+      dplyr::ungroup() %>%
       dplyr::mutate(geo = paste0(geo_colname, "_", !!as.name(geo_colname))) %>%
       dplyr::select(-dplyr::one_of(geo_colname)) %>%
       tidyr::gather(key = category, value = target, -geo) %>%
